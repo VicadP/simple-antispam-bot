@@ -2,6 +2,7 @@ from pathlib import Path
 
 class Settings:
     TELEGRAM_TOKEN: str = ""
+    BOT_MODE: str = "soft"
     ROOT_PATH: Path = Path().cwd()
     DB_PATH: Path = ROOT_PATH / "data/embeddings.sqlite3"
     CLF_PATH: Path = ROOT_PATH / "bot/core/classifier.joblib"
@@ -12,7 +13,9 @@ class Settings:
     PROBA_TRHLD: float = 0.6
     SIMILIARITY_TRHLD: float = 0.90                          # чем выше, тем меньше fpr. При смене модели нужно перекалибровывать порог
     EMOJI_TRHLD: float = 0.35
-    WHITELIST: list = []                                     # whitelist для "неприкосновенных" пользователей
+    WHITELIST: list = [
+        
+    ]  
 
 class Queries:
     CREATE_TABLE: str =  """

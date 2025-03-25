@@ -1,5 +1,6 @@
 from bot.config.settings import Settings
 from bot.core.encoder import TextEncoder
+from bot.core.utils import check_is_admin, delete_reply_on_command, delete_command
 from bot.data.utils import get_embeddings, write_to_csv
 import logging
 import emoji
@@ -18,81 +19,164 @@ logger = logging.getLogger("bot_logger")
 class Handler:
 
     def __init__(self):
-        self.classifier = joblib.load(Settings.CLF_PATH)
-        self.encoder_clf = TextEncoder(Settings.MODEL_CLS)
-        self.encoder_sts = TextEncoder(Settings.MODEL_STS)
+        try:
+            self.classifier = joblib.load(Settings.CLF_PATH)
+        except Exception as e:
+            logger.critical(f"Ошибка инициализации классификатора: {e}")
+            raise
+
+        try:
+            self.encoder_clf = TextEncoder(Settings.MODEL_CLS)
+            self.encoder_sts = TextEncoder(Settings.MODEL_STS)
+        except Exception as e:
+            logger.critical(f"Ошибка инициализации энкодера: {e}")
+            raise
+
+        try:
+            self.embeddings = get_embeddings()
+        except Exception as e:
+            logger.critical(f"Ошибка загрузки эмбедингов: {e}")
+            raise
+
         self.whitelist = Settings.WHITELIST
-        self.embeddings = get_embeddings()
 
     def gauge_emoji_frac(self, message: str) -> bool:
-        emoji_count = emoji.emoji_count(message)
-        total_count = len(message)
-        emoji_frac = emoji_count / total_count
-        #logger.info(f"Доля эмодзи : {emoji_frac:.2f}") # вероятно, этот лог лучше перенести на уровень логирования при удалении/бане
-        return emoji_frac > Settings.EMOJI_TRHLD
+        try:
+            emoji_count = emoji.emoji_count(message)
+            total_count = len(message)
+            if total_count == 0:
+                logger.warning("Пустое сообщение при проверке на эмодзи")
+                return False
+            emoji_frac = emoji_count / total_count
+            return emoji_frac > Settings.EMOJI_TRHLD
+        except Exception as e:
+            logger.error(f"Ошибка измерения доли эмодзи: {e}")
+            return False          
 
     def gauge_similiarity(self, message: str) -> bool:
-        similiarity = self.encoder_sts.compute_similiarity([message], self.embeddings)
-        #logger.info(f"Максимальная схожесть: {similiarity:.2f}")
-        return similiarity > Settings.SIMILIARITY_TRHLD
+        try:
+            similiarity = self.encoder_sts.compute_similiarity([message], self.embeddings)
+            return similiarity > Settings.SIMILIARITY_TRHLD
+        except Exception as e:
+            logger.error(f"Ошибка измерения косинусной близости: {e}")
+            return False
     
     def gauge_probability(self, message: str) -> bool:
-        message_embedding = self.encoder_clf.encode([message])
-        probability = self.classifier.predict_proba(message_embedding)[:, 1]
-        #logger.info(f"Вероятность P(y=spam|x) = {probability}")
-        return probability > Settings.PROBA_TRHLD
-        
-    def log_ban(self, user_id: int, message: str, reason: str):
-        logger.info(f"Пользователь: {user_id} забанен. Причина: {reason}. Сообщение: '{message}'")
-
-    def log_delete(self, user_id: int, message: str, reason: str):
-        logger.info(f"Сообщение: '{message}' удалено. Пользователь: {user_id}. Причина: {reason}")
-
-    async def delete_message(self, context: CallbackContext, chat_id: int, user_id: int, message_id: int):
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+            message_embedding = self.encoder_clf.encode([message])
+            probability = self.classifier.predict_proba(message_embedding)[:, 1]
+            return probability > Settings.PROBA_TRHLD
         except Exception as e:
-            logger.error(f"Ошибка обработки сообщения пользователя {user_id}: {e}")
+            logger.error(f"Ошибка измерения P(y=spam|x): {e}")
+            return False 
+        
+    def log_ban(self, user_id: int, reason: str):
+        logger.info(f"Пользователь: {user_id} забанен. Причина: {reason}")
 
-    async def ban_user(self, context: CallbackContext, chat_id: int, user_id: int):
-        pass # дописать под сценарий бана
+    def log_delete(self, user_id: int, reason: str):
+        logger.info(f"Сообщение пользователя удалено: {user_id}. Причина: {reason}")
+
+    async def delete_message(self, update: Update, context: CallbackContext):
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id, 
+                message_id=update.effective_message.id
+            )
+            return
+        except Exception as e:
+            logger.error(f"Ошибка удаления сообщения: {e}")
+
+    async def ban_user(self, update: Update, context: CallbackContext):
+        try:
+            await context.bot.ban_chat_member(
+                chat_id=update.effective_chat.id, 
+                user_id=update.effective_user.id
+            )
+            return
+        except Exception as e:
+            logger.error(f"Ошибка бана пользователя: {e}")
 
     async def analyze_message(self, update: Update, context: CallbackContext):
-        chat_id = update.effective_chat.id 
-        user_id = update.effective_user.id
-        message_id = update.effective_message.id
-        message_text = update.effective_message.text
+        try:
+            user_id = update.effective_user.id
+            message_text = update.effective_message.text
+            if len(message_text) <= 15:
+                return
+            if user_id in self.whitelist:
+                logger.info(f"Пользователь  в белом списке: {user_id}")
+                return
+            checks = [
+                (self.gauge_emoji_frac,  "Доля эмодзи выше порога"),
+                (self.gauge_similiarity,  "Косинусная близость выше порога"),
+                (self.gauge_probability, "P(y=spam|x) выше порога"),
+            ]
+            for check, reason in checks:
+                if check(message_text):
+                    if Settings.BOT_MODE == "soft":
+                        self.log_delete(user_id, reason)
+                        await self.delete_message(update, context)
+                        return
+                    else:
+                        self.log_ban(user_id, reason)
+                        #await self.ban_user(update, context)
+                        return        
+        except Exception as e:
+            logger.error(f"Ошибка анализа сообщения: {e}")
 
-        if len(message_text) <= 15: # короткие сообщения не обрабатываем (не подходят под паттерн спама)
-            return
-        elif user_id in self.whitelist:
-            logger.info(f"Пользователь {user_id} в whitelist-е.")
-            return
-        elif self.gauge_emoji_frac(message_text):
-            self.log_delete(user_id, message_text, "Доля emoji выше порога")
-            await self.delete_message(context, chat_id, user_id, message_id)
-            return
-        elif self.gauge_similiarity(message_text):
-            self.log_delete(user_id, message_text, "Cosine similiarity выше порога")
-            await self.delete_message(context, chat_id, user_id, message_id)
-            return
-        elif self.gauge_probability(message_text):
-            self.log_delete(user_id, message_text, "P(y=spam|x) выше порога")
-            await self.delete_message(context, chat_id, user_id, message_id)
-            return
-
+    @delete_command(5)
+    @delete_reply_on_command(3)
     async def spam_command(self, update: Update, context: CallbackContext):
         if update.effective_message.reply_to_message is None:
-            await update.message.reply_text("Ответьте на сообщение, которое вы хотите отметить как спам, используя /spam")
-            return
-        
-        message_id = update.effective_message.message_id
+            return await update.message.reply_text("Ответьте на сообщение, которое вы хотите отметить как спам, используя /spam")
         reply = update.effective_message.reply_to_message
-
-        write_to_csv(Settings.DATA_PATH, reply.text)
-        logger.info(f"Сообщение '{reply.text}' добавлено как спам")
-    
         try:
-            await context.bot.delete_messages(chat_id=reply.chat.id, message_ids=[reply.message_id, message_id])
+            write_to_csv(Settings.DATA_PATH, reply.text)
+            logger.info(f"Сообщение сохранено:'{reply.text}'")
         except Exception as e:
-            logger.error(f"Ошибка обработки команды {e}")
+            logger.error(f"Ошибка сохранения сообщения: {e}")
+            await update.message.reply_text("Ошибка сохранения сообщения") # критичная функциональность
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id, 
+                message_id=reply.message_id
+            )
+            return
+        except Exception as e:
+            logger.error(f"Ошибка удаления сообщения: {e}")    
+
+    @delete_command(5)
+    @delete_reply_on_command(3)
+    @check_is_admin
+    async def mode_command(self, update: Update, context: CallbackContext):
+        try:
+            if not context.args:
+                return await update.message.reply_text(f"Текущий режим бота {Settings.BOT_MODE}")
+            mode = context.args[0].lower()
+            if mode not in ["soft", "hard"]:
+                return await update.message.reply_text("Некорректный ввод. Используйте /mode soft или /mode hard")
+            Settings.BOT_MODE = mode
+            return await update.message.reply_text(f"Режим бота изменен на {Settings.BOT_MODE}")
+        except Exception as e:
+            logger.error(f"Ошибка исполнения команды /mode: {e}")
+
+    @delete_command(30)
+    @delete_reply_on_command(30)
+    async def help_command(self, update: Update, context: CallbackContext):
+        help_message = """
+        Этот бот сканирует все сообщения в группе для определения спама.
+        Поведение бота зависит от его режима:
+            - В режиме `soft` бот удаляет спам сообщения
+            - В режиме `hard` бот банит пользователя, отправившего спам сообщение
+        Режим может быть изменен через команду `/mode` администраторами канала.
+
+        У пользователя есть возможность отметить спам сообщение, в случае, если бот его пропустил.
+        Для этого необходимо ответить на спам сообщение с командой `/spam`, данная команда удаляет пересланное спам сообщение и 
+        добавляет его в обучающую выборку.
+        """
+        try:
+            return await update.message.reply_text(
+                text=help_message,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка исполнения команды /help: {e}")

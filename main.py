@@ -7,8 +7,12 @@ def main():
     handler = Handler()
     analyzer = MessageHandler(filters.TEXT & ~filters.COMMAND, handler.analyze_message)
     spam_command = CommandHandler("spam", handler.spam_command)
+    mode_command = CommandHandler("mode", handler.mode_command)
+    help_command = CommandHandler("help", handler.help_command)
     application.add_handler(analyzer)
     application.add_handler(spam_command)
+    application.add_handler(mode_command)
+    application.add_handler(help_command)
     application.run_polling()
 
 if __name__ == '__main__':
