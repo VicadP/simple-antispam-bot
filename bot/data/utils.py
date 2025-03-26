@@ -11,6 +11,7 @@ def get_embeddings() -> ndarray:
     return np.array(embeddings)
 
 def write_to_csv(csv_path, message: str, label: int = 1):
+    message = " ".join(message.split()) # для обработки многострочных сообщений
     with csv_path.open(mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter=";", quoting=csv.QUOTE_NONE, escapechar="\\")
         writer.writerow([message, label])
