@@ -5,16 +5,29 @@ from bot.data.utils import get_embeddings, write_to_csv
 import logging
 import emoji
 import joblib
-from telegram import Update
+from telegram import Update, User
 from telegram.ext import CallbackContext
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
-logging.getLogger('httpx').setLevel(logging.WARNING) # убираем шум
 logger = logging.getLogger("bot_logger")
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+file_handler = logging.FileHandler(
+    filename=Settings.ROOT_PATH / "data/bot.log",
+    mode="a",
+    encoding="utf-8"
+)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+logger.propagate = False
 
 class Handler:
 
@@ -25,8 +38,7 @@ class Handler:
             logger.critical(f"Ошибка инициализации классификатора: {e}")
             raise
         try:
-            self.encoder_clf = TextEncoder(Settings.MODEL_CLS)
-            self.encoder_sts = TextEncoder(Settings.MODEL_STS)
+            self.encoder = TextEncoder(Settings.MODEL_CLS)
         except Exception as e:
             logger.critical(f"Ошибка инициализации энкодера: {e}")
             raise
@@ -52,7 +64,7 @@ class Handler:
 
     def gauge_similiarity(self, message: str) -> bool:
         try:
-            similiarity = self.encoder_sts.compute_similiarity([message], self.embeddings)
+            similiarity = self.encoder.compute_similiarity([message], self.embeddings)
             return similiarity > Settings.SIMILIARITY_TRHLD
         except Exception as e:
             logger.error(f"Ошибка измерения косинусной близости: {e}")
@@ -60,18 +72,18 @@ class Handler:
     
     def gauge_probability(self, message: str) -> bool:
         try:
-            message_embedding = self.encoder_clf.encode([message])
+            message_embedding = self.encoder.encode([message])
             probability = self.classifier.predict_proba(message_embedding)[:, 1]
             return probability > Settings.PROBA_TRHLD
         except Exception as e:
             logger.error(f"Ошибка измерения P(y=spam|x): {e}")
             return False 
         
-    def log_ban(self, user_id: int, reason: str):
-        logger.info(f"Пользователь: {user_id} забанен. Причина: {reason}")
+    def log_ban(self, user: User, reason: str):
+        logger.info(f"Пользователь: {user.id}, {user.username}. Действие: бан. Причина: {reason}")
 
-    def log_delete(self, user_id: int, reason: str):
-        logger.info(f"Сообщение пользователя удалено: {user_id}. Причина: {reason}")
+    def log_delete(self, user: User, reason: str):
+        logger.info(f"Пользователь: {user.id}, {user.username}. Действие: удаление сообщения. Причина: {reason}")
 
     async def delete_message(self, update: Update, context: CallbackContext):
         try:
@@ -95,27 +107,28 @@ class Handler:
 
     async def analyze_message(self, update: Update, context: CallbackContext):
         try:
-            user_id = update.effective_user.id
+            user = update.effective_user
             message_text = update.effective_message.text
             if len(message_text) <= 15:
                 return
-            if user_id in self.whitelist:
-                logger.info(f"Пользователь  в белом списке: {user_id}")
+            if user.id in self.whitelist:
+                logger.info(f"Пользователь  в белом списке: {user.id}, {user.username}")
                 return
             checks = [
-                (self.gauge_emoji_frac,  "Доля эмодзи выше порога"),
-                (self.gauge_similiarity,  "Косинусная близость выше порога"),
-                (self.gauge_probability, "P(y=spam|x) выше порога"),
+                (self.gauge_emoji_frac,  f"Доля эмодзи выше порога"),
+                (self.gauge_probability, f"P(y=spam|x) выше порога"),
+                (self.gauge_similiarity, f"Косинусная близость выше порога")
             ]
             for check, reason in checks:
                 if check(message_text):
                     if Settings.BOT_MODE == "soft":
-                        self.log_delete(user_id, reason)
+                        self.log_delete(user, reason)
                         await self.delete_message(update, context)
                         return
                     else:
-                        self.log_ban(user_id, reason)
-                        #await self.ban_user(update, context)
+                        self.log_ban(user, reason)
+                        await self.delete_message(update, context)
+                        await self.ban_user(update, context)
                         return        
         except Exception as e:
             logger.error(f"Ошибка анализа сообщения: {e}")

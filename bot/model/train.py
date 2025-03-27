@@ -23,7 +23,7 @@ def run_train():
         dm = DatasetManager()
         X, y = encoder.encode(dm.get_X()), dm.get_y()
         cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=Settings.RNG_INT)
-        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1742725246.json")
+        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1743082245.json")
         clf = CalibratedClassifierCV(
                 LinearSVC(**best_params, max_iter=10_000, random_state=Settings.RNG_INT),
                 method="sigmoid",

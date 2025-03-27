@@ -15,7 +15,7 @@ RELOAD_TABLE = 1 # оставляем 1, кроме самой первой за
 
 def run_loading():
     try:
-        encoder = TextEncoder(Settings.MODEL_STS) # для измерения схожести используем модель, отличную от классификации
+        encoder = TextEncoder(Settings.MODEL_CLS)
         dm = DatasetManager()
         db = DatabaseManager()
 

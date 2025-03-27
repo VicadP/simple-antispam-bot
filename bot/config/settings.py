@@ -7,11 +7,11 @@ class Settings:
     DB_PATH: Path = ROOT_PATH / "data/embeddings.sqlite3"
     CLF_PATH: Path = ROOT_PATH / "bot/core/classifier.joblib"
     DATA_PATH: Path = ROOT_PATH / "data/data.csv"
-    MODEL_CLS: str = "sergeyzh/rubert-tiny-turbo"            # по результатам калибровки лучшая модель в соотношение производительность-размер (можно попробовать более тяжелые модели)
-    MODEL_STS: str = "paraphrase-multilingual-MiniLM-L12-v2" # по результатам калибровки модель более точная в измерении схожести чем rubert*
+    MODEL_CLS: str = "sergeyzh/rubert-tiny-turbo"         
+    #MODEL_STS: str = "paraphrase-multilingual-MiniLM-L12-v2"
     RNG_INT: int = 42
-    PROBA_TRHLD: float = 0.6
-    SIMILIARITY_TRHLD: float = 0.90                          # чем выше, тем меньше fpr. При смене модели нужно перекалибровывать порог
+    PROBA_TRHLD: float = 0.65
+    SIMILIARITY_TRHLD: float = 0.90                        
     EMOJI_TRHLD: float = 0.35
     WHITELIST: list = [
         
