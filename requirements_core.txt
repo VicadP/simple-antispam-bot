@@ -1,0 +1,6 @@
+sentence-transformers==3.4.1
+scikit-learn==1.6.1
+numpy==2.2.4
+pandas==2.2.3
+emoji==2.14.1
+python-telegram-bot==22.0
