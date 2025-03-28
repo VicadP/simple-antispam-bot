@@ -109,9 +109,9 @@ class Handler:
         try:
             user = update.effective_user
             message_text = update.effective_message.text
-            if len(message_text) <= 15:
+            if len(message_text) <= Settings.LEN_TRHLD:
                 return
-            if user.id in self.whitelist:
+            if user.id in context.chat_data.get("whitelist", set()):
                 logger.info(f"Пользователь в белом списке: {user.id}, {user.username}")
                 return
             checks = [
