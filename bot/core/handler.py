@@ -112,7 +112,7 @@ class Handler:
             if len(message_text) <= 15:
                 return
             if user.id in self.whitelist:
-                logger.info(f"Пользователь  в белом списке: {user.id}, {user.username}")
+                logger.info(f"Пользователь в белом списке: {user.id}, {user.username}")
                 return
             checks = [
                 (self.gauge_emoji_frac,  f"Доля эмодзи выше порога"),
@@ -121,7 +121,7 @@ class Handler:
             ]
             for check, reason in checks:
                 if check(message_text):
-                    if Settings.BOT_MODE == "soft":
+                    if context.chat_data.get("bot_mode", Settings.BOT_MODE) == "soft":
                         self.log_delete(user, reason)
                         await self.delete_message(update, context)
                         return
@@ -136,36 +136,41 @@ class Handler:
     @delete_command(5)
     @delete_reply_on_command(3)
     async def spam_command(self, update: Update, context: CallbackContext):
-        if update.effective_message.reply_to_message is None:
-            return await update.message.reply_text("Ответьте на сообщение, которое вы хотите отметить как спам, используя /spam")
-        reply = update.effective_message.reply_to_message
         try:
-            write_to_csv(Settings.DATA_PATH, reply.text)
-            logger.info(f"Сообщение сохранено:'{reply.text}'")
+            if update.effective_message.reply_to_message is None:
+                return await update.message.reply_text("Ответьте на сообщение, которое вы хотите отметить как спам, используя /spam")
+            reply = update.effective_message.reply_to_message
+            try:
+                write_to_csv(Settings.DATA_PATH, reply.text)
+                logger.info(f"Сообщение сохранено:'{reply.text}'")
+            except Exception as e:
+                logger.error(f"Ошибка сохранения сообщения: {e}")
+                await update.message.reply_text("Ошибка сохранения сообщения")
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.effective_chat.id, 
+                    message_id=reply.message_id
+                )
+                return
+            except Exception as e:
+                logger.error(f"Ошибка удаления сообщения: {e}")
         except Exception as e:
-            logger.error(f"Ошибка сохранения сообщения: {e}")
-            await update.message.reply_text("Ошибка сохранения сообщения") # критичная функциональность
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id, 
-                message_id=reply.message_id
-            )
-            return
-        except Exception as e:
-            logger.error(f"Ошибка удаления сообщения: {e}")    
+            logger.error(f"Ошибка исполнения команды /spam: {e}")
 
     @delete_command(5)
     @delete_reply_on_command(3)
     @check_is_admin
     async def mode_command(self, update: Update, context: CallbackContext):
         try:
-            if not context.args:
-                return await update.message.reply_text(f"Текущий режим бота {Settings.BOT_MODE}")
-            mode = context.args[0].lower()
+            args = context.args
+            if not args:
+                current_mode = context.chat_data.get("bot_mode", Settings.BOT_MODE)
+                return await update.message.reply_text(f"Текущий режим бота {current_mode}")
+            mode = args[0].lower()
             if mode not in ["soft", "hard"]:
                 return await update.message.reply_text("Некорректный ввод. Используйте /mode soft или /mode hard")
-            Settings.BOT_MODE = mode
-            return await update.message.reply_text(f"Режим бота изменен на {Settings.BOT_MODE}")
+            context.chat_data["bot_mode"] = mode
+            return await update.message.reply_text(f"Режим бота изменен на {mode}")
         except Exception as e:
             logger.error(f"Ошибка исполнения команды /mode: {e}")
 
@@ -190,3 +195,48 @@ class Handler:
             )
         except Exception as e:
             logger.error(f"Ошибка исполнения команды /help: {e}")
+
+    @delete_command(7)
+    @delete_reply_on_command(5)
+    @check_is_admin
+    async def whitelist_command(self, update: Update, context: CallbackContext):
+        try:
+            user_to_manage = None
+            args = context.args
+            if "whitelist" not in context.chat_data:
+                context.chat_data["whitelist"] = set()
+            if not args or len(args) != 2:
+                return await update.message.reply_text(
+                    "Используйте: /whitelist add user_id или /whitelist remove user_id"
+                )
+            if not args[1].isdigit():
+                return await update.message.reply_text(
+                    "Некорректный id пользователя. Используйте @username_to_id_bot для получения id пользователя"
+                )
+            try:
+                member = await context.bot.get_chat_member(update.effective_chat.id, int(args[1]))
+                user_to_manage = member.user.id
+            except Exception as e:
+                logger.error(f"Пользователь {args[1]} не найден")
+                return await update.message.reply_text(f"Пользователь {args[1]} не найден")
+            action = args[0].lower()
+            if action not in ["add", "remove"]:
+                return await update.message.reply_text(
+                    "Некорректная команда. Используйте /whitelist add user_id или /whitelist remove user_id"
+                )
+            if action == "add":
+                if user_to_manage in context.chat_data["whitelist"]:
+                    return await update.message.reply_text(f"Пользователь {user_to_manage} уже добавлен в whitelist") 
+                context.chat_data["whitelist"].add(user_to_manage)
+                return await update.message.reply_text(f"Пользователь {user_to_manage} добавлен в whitelist") 
+            elif action == "remove":
+                try:
+                    context.chat_data["whitelist"].remove(user_to_manage)
+                    return await update.message.reply_text(f"Пользователь {user_to_manage} удален из whitelist") 
+                except KeyError:
+                    return await update.message.reply_text(f"Пользователь {user_to_manage} не найден в whitelist")
+        except Exception as e:
+            logger.error(f"Ошибка исполнения команды /whitelist: {e}")
+
+
+        

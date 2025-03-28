@@ -11,11 +11,8 @@ class Settings:
     #MODEL_STS: str = "paraphrase-multilingual-MiniLM-L12-v2"
     RNG_INT: int = 42
     PROBA_TRHLD: float = 0.65
-    SIMILIARITY_TRHLD: float = 0.90                        
+    SIMILIARITY_TRHLD: float = 0.95                        
     EMOJI_TRHLD: float = 0.35
-    WHITELIST: list = [
-        
-    ]  
 
 class Queries:
     CREATE_TABLE: str =  """

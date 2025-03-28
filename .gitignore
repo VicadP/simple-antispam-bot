@@ -18,6 +18,7 @@ Thumbs.db
 *.ckpt
 *.db
 *.csv
+*.pickle
 *.sqlite3
 .vscode/
 .idea/
