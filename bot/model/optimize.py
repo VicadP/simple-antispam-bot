@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.naive_bayes import GaussianNB
 import optuna
+import numpy as np
 
 
 def run_optimization():
@@ -24,7 +25,8 @@ def run_optimization():
         C = trial.suggest_float("C", 1.0, 1e2, log=True)
         loss = trial.suggest_categorical("loss", ["hinge", "squared_hinge"])
         model = LinearSVC(C=C, loss=loss, max_iter=10_000, random_state=Settings.RNG_INT)
-        return cross_val_score(model, X, y, cv=cv, scoring="f1").mean()
+        y_transformed = np.where(y == 0, -1, 1)
+        return cross_val_score(model, X, y_transformed, cv=cv, scoring="f1").mean()
 
     def objective_logreg(trial: optuna.Trial) -> float:
         C = trial.suggest_float("C", 1.0, 1e2, log=True)

@@ -10,6 +10,7 @@ from bot.model.utils import read_best_params
 from sklearn.model_selection import StratifiedKFold
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
+import numpy as np
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -17,13 +18,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("classifier_logger")
 
+SVM_CLS = 1
+
 def run_train():
     try:
         encoder = TextEncoder(Settings.MODEL_CLS)
         dm = DatasetManager()
         X, y = encoder.encode(dm.get_X()), dm.get_y()
+        if SVM_CLS:
+            y = np.where(y == 0, -1, 1)
         cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=Settings.RNG_INT)
-        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1743082245.json")
+        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1743317634.json")
         clf = CalibratedClassifierCV(
                 LinearSVC(**best_params, max_iter=10_000, random_state=Settings.RNG_INT),
                 method="sigmoid",

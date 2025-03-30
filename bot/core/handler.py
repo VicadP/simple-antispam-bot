@@ -47,7 +47,6 @@ class Handler:
         except Exception as e:
             logger.critical(f"Ошибка загрузки эмбедингов: {e}")
             raise
-        self.whitelist = Settings.WHITELIST
 
     def gauge_emoji_frac(self, message: str) -> bool:
         try:
@@ -65,6 +64,7 @@ class Handler:
     def gauge_similiarity(self, message: str) -> bool:
         try:
             similiarity = self.encoder.compute_similiarity([message], self.embeddings)
+            logger.info(f"Cosin sim: {similiarity:.2f}")
             return similiarity > Settings.SIMILIARITY_TRHLD
         except Exception as e:
             logger.error(f"Ошибка измерения косинусной близости: {e}")
@@ -74,6 +74,7 @@ class Handler:
         try:
             message_embedding = self.encoder.encode([message])
             probability = self.classifier.predict_proba(message_embedding)[:, 1]
+            logger.info(f"P(y=spam|x): {probability}")
             return probability > Settings.PROBA_TRHLD
         except Exception as e:
             logger.error(f"Ошибка измерения P(y=spam|x): {e}")

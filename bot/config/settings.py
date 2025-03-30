@@ -10,8 +10,8 @@ class Settings:
     MODEL_CLS: str = "sergeyzh/rubert-tiny-turbo"         
     #MODEL_STS: str = "paraphrase-multilingual-MiniLM-L12-v2"
     RNG_INT: int = 42
-    LEN_TRHLD: int = 15
-    PROBA_TRHLD: float = 0.65
+    LEN_TRHLD: int = 30
+    PROBA_TRHLD: float = 0.5
     SIMILIARITY_TRHLD: float = 0.95                        
     EMOJI_TRHLD: float = 0.35
 
