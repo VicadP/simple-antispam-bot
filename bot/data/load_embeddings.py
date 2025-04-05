@@ -9,7 +9,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger("loader_logger")
+logger = logging.getLogger("embedding_loader")
 
 RELOAD_TABLE = 1 # оставляем 1, кроме самой первой загрузки
 
@@ -29,7 +29,7 @@ def run_loading():
         db.insert_many(Queries.INSERT, rows)
         logger.info(f"Строки успешно загружены. Строк загружено: {len(db.select_all(Queries.SELECT))}")
     except Exception as e:
-        logger.error(f"Ошибка при создании и сохранении эмбедингов: {e}")
+        logger.error(f"Ошибка при создании и сохранении эмбедингов\n{e}")
 
 if __name__ == "__main__":
     run_loading()

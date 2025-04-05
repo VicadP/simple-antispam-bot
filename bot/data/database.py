@@ -7,7 +7,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger("db_logger")
+logger = logging.getLogger("database")
 
 class DatabaseManager:
 
@@ -21,8 +21,8 @@ class DatabaseManager:
             cursor.execute(query)
             con.commit()
             logger.info("Таблица успешно создана")
-        except Exception as err:
-            logger.info(f"Ошибка в запросе: {query}\n Error: {err}")
+        except Exception as e:
+            logger.error(f"Ошибка в запросе: {query}\n{e}")
         finally:
             con.close()
         
@@ -33,8 +33,8 @@ class DatabaseManager:
             cursor.execute(query, row)
             con.commit()
             logger.info("Строка успешно добавлена")
-        except Exception as err:
-            logger.info(f"Ошибка в запросе: {query}\n Error: {err}")
+        except Exception as e:
+            logger.error(f"Ошибка в запросе: {query}\n{e}")
         finally:
             con.close()
 
@@ -45,8 +45,8 @@ class DatabaseManager:
             cursor.executemany(query, rows)
             con.commit()
             logger.info("Строки успешно добавлены")
-        except Exception as err:
-            logger.info(f"Ошибка в запросе: {query}\n Error: {err}")
+        except Exception as e:
+            logger.error(f"Ошибка в запросе: {query}\n{e}")
         finally:
             con.close() 
 
@@ -62,8 +62,8 @@ class DatabaseManager:
                 logger.info("Строки и sequence успешно удалены")
             else:
                 logger.info("Строки успешно удалены")
-        except Exception as err:
-            logger.info(f"Ошибка в запросе: {query_table}\n Error: {err}")
+        except Exception as e:
+            logger.error(f"Ошибка в запросе: {query_table}\n{e}")
         finally:
             con.close()              
 
@@ -74,7 +74,7 @@ class DatabaseManager:
             cursor.execute(query)
             rows = cursor.fetchall()
             return rows
-        except Exception as err:
-            logger.info(f"Ошибка в запросе: {query}\n Error: {err}")
+        except Exception as e:
+            logger.error(f"Ошибка в запросе: {query}\n{e}")
         finally:
             con.close()

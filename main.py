@@ -1,6 +1,15 @@
 from bot.config.settings import Settings
-from bot.core.handler import Handler
-from telegram.ext import CommandHandler, MessageHandler, filters, ApplicationBuilder, PicklePersistence, PersistenceInput
+from bot.core.handler import SpamDetector
+from bot.core.handler import help
+from bot.core.handler import mark
+from bot.core.handler import whitelist
+from telegram.ext import CommandHandler
+from telegram.ext import CallbackQueryHandler
+from telegram.ext import MessageHandler
+from telegram.ext import ApplicationBuilder
+from telegram.ext import PicklePersistence
+from telegram.ext import PersistenceInput
+from telegram.ext import filters
 
 def main():
     application = ApplicationBuilder() \
@@ -15,17 +24,16 @@ def main():
             )
         ) \
         .build()
-    handler = Handler()
-    analyzer = MessageHandler(filters.TEXT & ~filters.COMMAND, handler.analyze_message)
-    spam_command = CommandHandler("spam", handler.spam_command)
-    mode_command = CommandHandler("mode", handler.mode_command)
-    help_command = CommandHandler("help", handler.help_command)
-    whitelist_command = CommandHandler("whitelist", handler.whitelist_command)
-    application.add_handler(analyzer)
-    application.add_handler(spam_command)
-    application.add_handler(mode_command)
-    application.add_handler(help_command)
-    application.add_handler(whitelist_command)
+    spam_detector = SpamDetector()
+
+    application.add_handlers([
+        MessageHandler(filters.TEXT & ~filters.COMMAND, spam_detector.analyze_message),
+        CallbackQueryHandler(spam_detector.handle_captcha),
+        CommandHandler("help", help),
+        CommandHandler("mark", mark),
+        CommandHandler("whitelist", whitelist)
+    ])
+    
     application.run_polling()
 
 if __name__ == '__main__':

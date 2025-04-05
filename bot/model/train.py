@@ -16,7 +16,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger("classifier_logger")
+logger = logging.getLogger("classifier")
 
 SVM_CLS = 1
 
@@ -28,7 +28,7 @@ def run_train():
         if SVM_CLS:
             y = np.where(y == 0, -1, 1)
         cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=Settings.RNG_INT)
-        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1743317634.json")
+        best_params = read_best_params(Settings.ROOT_PATH / "bot/model/optunalogs/linear_svc_1743772017.json")
         clf = CalibratedClassifierCV(
                 LinearSVC(**best_params, max_iter=10_000, random_state=Settings.RNG_INT),
                 method="sigmoid",
@@ -39,7 +39,7 @@ def run_train():
         joblib.dump(clf, Settings.ROOT_PATH / "bot/core/classifier.joblib")
         logger.info("Модель успешно обучена и сохранена")
     except Exception as e:
-        logger.error(f"Ошибка при обучении и сохранении модели: {e}")
+        logger.error(f"Ошибка при обучении и сохранении модели\n{e}")
 
 if __name__ == "__main__":
     run_train()
