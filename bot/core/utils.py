@@ -2,9 +2,8 @@ from functools import wraps
 from dataclasses import dataclass
 import logging
 import enum
-from typing import List, Union, Callable
 from asyncio import sleep as async_sleep
-from telegram import Update, ChatMember, Message, User
+from telegram import Update, ChatMember, Message
 from telegram.ext import CallbackContext
 
 logging.basicConfig(
@@ -101,21 +100,4 @@ async def ban_user_with_delay(context: CallbackContext, chat_id: int, user_id: i
         return True
     except Exception as e:
         logger.error(f"Ошибка бана пользователя\n{e}")
-        return False
-
-def apply_ban(context: CallbackContext, chat_id: int, user_id: int, user_name: str, message_ids: List[int], reason: int, delay: int) -> bool:
-    """
-    Объединяет логику бана в связку: бан и удаление сообщений
-    """
-    try:
-        context.application.create_task(
-            ban_user_with_delay(context=context, chat_id=chat_id, user_id=user_id, user_name=user_name, reason=reason, delay=delay)
-        )
-        for message_id in message_ids:
-            context.application.create_task(
-                delete_message_with_delay(context=context, chat_id=chat_id, message_id=message_id, delay=5)
-            )
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка обработки бана\n{e}")
         return False

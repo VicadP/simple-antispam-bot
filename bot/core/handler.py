@@ -154,29 +154,20 @@ class SpamDetector:
                 self._clear_job_queue(context=context, job_name=f"{callback_data.chat_id}_{callback_data.user_id}_{callback_data.message_id}")
                 if callback_data.correct == callback_data.selected:
                     await query.edit_message_text(text="✅ Верификация успешно пройдена. Вы добавлены в whitelist")
-                    self._add_to_whitelist(context=context, user_id=callback_data.user_id)
-                    await self._restrict_user_from_messaging(
-                        context=context, 
-                        chat_id=callback_data.chat_id, 
-                        user_id=callback_data.user_id, 
-                        lift=True, 
-                        minutes=0
+                    await self._process_positive_scenario(
+                        context=context,
+                        chat_id=callback_data.chat_id,
+                        user_id=callback_data.user_id,
+                        message_id=query.message.id,
+                        lift=True,
+                        delay=5
                     )
-                    context.application.create_task(
-                        delete_message_with_delay(
-                            context=context, 
-                            chat_id=callback_data.chat_id, 
-                            message_id=query.message.id, 
-                            delay=5
-                        )
-                    )
-                    self.pending_users.discard((callback_data.chat_id, callback_data.user_id))
                     return True
                 else:
                     await query.edit_message_text(
                         text="❌ Верификация не пройдена. Вы будете удалены из чата.\n\nЕсли произошла ошибка, пишите: @the_vicad"
                     )
-                    apply_ban(
+                    self._process_negative_scenario(
                         context=context, 
                         chat_id=callback_data.chat_id, 
                         user_id=callback_data.user_id, 
@@ -185,7 +176,6 @@ class SpamDetector:
                         reason=callback_data.reason, 
                         delay=5
                     )
-                    self.pending_users.discard((callback_data.chat_id, callback_data.user_id))
                     return True
         except Exception as e:
             logger.info(f"Ошибка хэндлера: обработка капчи\n{e}")
@@ -201,7 +191,7 @@ class SpamDetector:
             await job_data.query_message.edit_text(
                 text="⏰ Капча просрочена. Вы будете удалены из чата.\n\nЕсли произошла ошибка, пишите: @the_vicad"
             )
-            apply_ban(
+            self._process_negative_scenario(
                 context=context, 
                 chat_id=job_data.chat_id, 
                 user_id=job_data.user_id, 
@@ -210,7 +200,6 @@ class SpamDetector:
                 reason=4, 
                 delay=5
             )
-            self.pending_users.discard((job_data.chat_id, job_data.user_id))
             return True
         except Exception as e:
             logger.error(f"Ошибка хэндлера: исполнение timeout job\n{e}")
@@ -282,10 +271,12 @@ class SpamDetector:
             can_send_polls=lift,
             can_add_web_page_previews=lift,
             can_invite_users=lift,
-            can_send_audios=lift,
             can_send_documents=lift,
             can_send_photos=lift,
-            can_send_videos=lift
+            can_send_videos=lift,
+            can_send_audios=lift,
+            can_send_video_notes=lift,
+            can_send_voice_notes=lift
         )
 
     @staticmethod
@@ -378,7 +369,58 @@ class SpamDetector:
         except Exception as e:
             logger.error(f"Ошибка хэлпера: добавление в whitelist\n{e}")
             return False
-               
+
+    def _process_negative_scenario(
+            self, 
+            context: CallbackContext, 
+            chat_id: int, 
+            user_id: int, 
+            user_name: str, 
+            message_ids: List[int], 
+            reason: int, 
+            delay: int
+        ) -> bool:
+        """
+        Обрабатывает сценарий, когда пользователь либо не ответил на капчу, либо ответил неверно
+        """
+        try:
+            context.application.create_task(
+                ban_user_with_delay(context=context, chat_id=chat_id, user_id=user_id, user_name=user_name, reason=reason, delay=delay)
+            )
+            for message_id in message_ids:
+                context.application.create_task(
+                    delete_message_with_delay(context=context, chat_id=chat_id, message_id=message_id, delay=5)
+                )
+            self.pending_users.discard((chat_id, user_id))
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка хэлпера: обработка негативного сценария\n{e}")
+            return False
+        
+    async def _process_positive_scenario(
+            self,
+            context: CallbackContext,
+            chat_id: int,
+            user_id: int,
+            message_id: int,
+            lift: bool,
+            delay: int
+        ) -> bool:
+        """
+        Обрабатывает сценарий, когда пользователь верно решил капчу
+        """
+        try:
+            self._add_to_whitelist(context=context, user_id=user_id)
+            await self._restrict_user_from_messaging(context=context, chat_id=chat_id, user_id=user_id, lift=lift, minutes=0)      
+            context.application.create_task(
+                delete_message_with_delay(context=context, chat_id=chat_id, message_id=message_id, delay=delay)
+            )
+            self.pending_users.discard((chat_id, user_id))
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка хэлпера: обработка позитивного сценария\n{e}")
+            return False
+
 ## ====== COMMANDS ====== ##
 @delete_command(60)
 @delete_reply_on_command(60)
