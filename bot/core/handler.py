@@ -420,7 +420,8 @@ async def help(update: Update, context: CallbackContext) -> Message:
     except Exception as e:
         logger.error(f"Ошибка исполнения команды /help\n{e}")
    
-@delete_command(2)
+@delete_command(5)
+@delete_reply_on_command(3)
 async def mark(update: Update, context: CallbackContext) -> Message:
     try:
         replied_message = update.effective_message.reply_to_message
