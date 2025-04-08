@@ -27,11 +27,11 @@ def main():
     spam_detector = SpamDetector()
 
     application.add_handlers([
-        MessageHandler(filters.TEXT & ~filters.COMMAND, spam_detector.analyze_message),
+        MessageHandler(filters=filters.TEXT & ~filters.COMMAND & ~filters.SenderChat.ALL, callback=spam_detector.analyze_message),
         CallbackQueryHandler(spam_detector.handle_captcha),
-        CommandHandler("help", help),
-        CommandHandler("mark", mark),
-        CommandHandler("whitelist", whitelist)
+        CommandHandler(command="help", callback=help),
+        CommandHandler(command="mark", callback=mark, filters=~filters.ChatType.PRIVATE),
+        CommandHandler(command="whitelist", callback=whitelist, filters=~filters.ChatType.PRIVATE)
     ])
     
     application.run_polling()

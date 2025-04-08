@@ -50,7 +50,6 @@ class SpamDetector:
     def __init__(self):
         self._load_component("classifier", joblib.load, Settings.CLF_PATH)
         self._load_component("encoder", TextEncoder, Settings.MODEL_CLS)
-        self._load_component("embeddings", get_embeddings)
         self.pending_users = set() # для пользователей, которые уже получили, но еще не разрешили капчу
 
     async def analyze_message(self, update: Update, context: CallbackContext) -> bool:
@@ -82,8 +81,7 @@ class SpamDetector:
             else:
                 checks = [
                     (self._gauge_emoji_frac,  BanReason.emoji.value),
-                    (self._gauge_probability, BanReason.probability.value),
-                    (self._gauge_similiarity, BanReason.similiarity.value)
+                    (self._gauge_probability, BanReason.probability.value)
                 ]
                 for check, reason in checks:
                     if check(message=message_text):
@@ -234,14 +232,6 @@ class SpamDetector:
         except Exception as e:
             logger.error(f"Ошибка хэлпера: оценка вероятности спама\n{e}")
             return False         
-
-    def _gauge_similiarity(self, message: str) -> bool:
-        try:
-            similiarity = self.encoder.compute_similiarity([message], self.embeddings)
-            return similiarity >= Settings.SIMILIARITY_TRHLD
-        except Exception as e:
-            logger.error(f"Ошибка хэлпера: измерение косинусной близости\n{e}")
-            return False
 
     async def _restrict_user_from_messaging(
             self, 
