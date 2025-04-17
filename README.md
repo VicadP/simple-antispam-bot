@@ -16,7 +16,7 @@
 
 После окончания стадии бета разработки бот был успешно развернут на сервере и запущен в одном из ТГ чатов с $\approx 400$ пользователями.
 
-![bot_service_uptime](figures\bot_service_uptime.png)
+![bot_service_uptime](https://github.com/VicadP/simple-antispam-bot/blob/32ef8854a5f9485d62d6aee90a07f0f309bf8594/figures/bot_service_uptime.png) 
 
 Бот стабильно отлавливает спам сообщения, что снимает необходимость удалять спам руками.
 
