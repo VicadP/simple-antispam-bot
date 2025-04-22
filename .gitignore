@@ -22,4 +22,5 @@ Thumbs.db
 *.sqlite3
 .vscode/
 .idea/
+notebooks/
 optunalogs/
